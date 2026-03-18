@@ -1,0 +1,38 @@
+# Example 2: Join orders (API) with products (CSV), aggregate
+
+
+SOURCE orders_api AS API {
+    url    = "https://shop.example.com/api/orders"
+    method = GET
+    auth   = API_KEY "x-api-key" "abc123xyz"
+}
+
+SOURCE products_csv AS CSV {
+    path     = "data/products.csv"
+    encoding = "utf-8"
+}
+
+PIPELINE sales_summary {
+    FETCH FROM orders_api, products_csv
+
+    JOIN products_csv ON orders_api.product_id = products_csv.id
+        TYPE LEFT
+
+    FILTER WHERE orders_api.status == "completed" AND
+                 products_csv.category LIKE "Electronics"
+
+    AGGREGATE {
+        SUM(orders_api.amount)   AS total_revenue
+        COUNT(orders_api.id)     AS order_count
+        AVG(orders_api.amount)   AS avg_order_value
+        MAX(orders_api.amount)   AS max_order
+    }
+
+    SORT BY total_revenue DESC
+}
+
+OUTPUT sales_report TO JSON {
+    from   = "sales_summary"
+    path   = "reports/sales_summary.json"
+    pretty = true
+}

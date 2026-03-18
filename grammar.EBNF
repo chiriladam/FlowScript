@@ -1,0 +1,134 @@
+(* ============================================================ *)
+(*   DATASYNC DSL — Multi-Source Data Integration Language      *)
+(*   Grammar Specification (EBNF)                               *)
+(* ============================================================ *)
+
+program         ::= statement+ EOF ;
+
+statement       ::= source_decl
+                  | pipeline_decl
+                  | output_decl ;
+
+(* ── Source Declarations ──────────────────────────────────── *)
+
+source_decl     ::= "SOURCE" IDENTIFIER "AS" source_type
+                    "{" source_body "}" ;
+
+source_type     ::= "API" | "CSV" | "JSON" | "XML" | "DATABASE" ;
+
+source_body     ::= source_option+ ;
+
+source_option   ::= "url"      "=" STRING
+                  | "path"     "=" STRING
+                  | "method"   "=" http_method
+                  | "headers"  "=" "{" header_list "}"
+                  | "auth"     "=" auth_expr
+                  | "query"    "=" STRING
+                  | "table"    "=" STRING
+                  | "encoding" "=" STRING ;
+
+http_method     ::= "GET" | "POST" | "PUT" | "DELETE" ;
+
+header_list     ::= header_pair ( "," header_pair )* ;
+header_pair     ::= STRING ":" STRING ;
+
+auth_expr       ::= "BEARER" STRING
+                  | "BASIC"  STRING STRING
+                  | "API_KEY" STRING STRING ;
+
+(* ── Pipeline Declarations ───────────────────────────────── *)
+
+pipeline_decl   ::= "PIPELINE" IDENTIFIER
+                    "{" pipeline_body "}" ;
+
+pipeline_body   ::= pipeline_step+ ;
+
+pipeline_step   ::= fetch_step
+                  | filter_step
+                  | map_step
+                  | join_step
+                  | aggregate_step
+                  | sort_step
+                  | limit_step ;
+
+fetch_step      ::= "FETCH" "FROM" IDENTIFIER ( "," IDENTIFIER )* ;
+
+filter_step     ::= "FILTER" "WHERE" condition ;
+
+map_step        ::= "MAP" "{" field_mapping+ "}" ;
+
+field_mapping   ::= IDENTIFIER "=" expr ;
+
+join_step       ::= "JOIN" IDENTIFIER "ON" IDENTIFIER "=" IDENTIFIER
+                    ( "TYPE" join_type )? ;
+
+join_type       ::= "INNER" | "LEFT" | "RIGHT" | "FULL" ;
+
+aggregate_step  ::= "AGGREGATE" "{" agg_rule+ "}" ;
+
+agg_rule        ::= agg_func "(" IDENTIFIER ")" "AS" IDENTIFIER ;
+
+agg_func        ::= "SUM" | "COUNT" | "AVG" | "MIN" | "MAX" ;
+
+sort_step       ::= "SORT" "BY" IDENTIFIER ( "ASC" | "DESC" )?
+                    ( "," IDENTIFIER ( "ASC" | "DESC" )? )* ;
+
+limit_step      ::= "LIMIT" INTEGER ;
+
+(* ── Conditions ──────────────────────────────────────────── *)
+
+condition       ::= condition "AND" condition
+                  | condition "OR"  condition
+                  | "NOT" condition
+                  | "(" condition ")"
+                  | comparison ;
+
+comparison      ::= expr compare_op expr ;
+
+compare_op      ::= "==" | "!=" | "<" | "<=" | ">" | ">="
+                  | "LIKE" | "IN" | "IS" "NULL" | "IS" "NOT" "NULL" ;
+
+(* ── Expressions ─────────────────────────────────────────── *)
+
+expr            ::= expr ( "+" | "-" ) term
+                  | term ;
+
+term            ::= term ( "*" | "/" ) factor
+                  | factor ;
+
+factor          ::= IDENTIFIER ( "." IDENTIFIER )*
+                  | STRING
+                  | NUMBER
+                  | "NULL"
+                  | "TRUE"
+                  | "FALSE"
+                  | "(" expr ")"
+                  | func_call ;
+
+func_call       ::= IDENTIFIER "(" ( expr ( "," expr )* )? ")" ;
+
+(* ── Output Declarations ─────────────────────────────────── *)
+
+output_decl     ::= "OUTPUT" IDENTIFIER "TO" output_type
+                    "{" output_body "}" ;
+
+output_type     ::= "CSV" | "JSON" | "XML" | "DATABASE" | "STDOUT" ;
+
+output_body     ::= output_option+ ;
+
+output_option   ::= "from"      "=" IDENTIFIER
+                  | "path"      "=" STRING
+                  | "table"     "=" STRING
+                  | "delimiter" "=" STRING
+                  | "pretty"    "=" BOOLEAN ;
+
+(* ── Terminals ───────────────────────────────────────────── *)
+
+IDENTIFIER      ::= [a-zA-Z_] [a-zA-Z0-9_]* ;
+STRING          ::= '"' [^"]* '"' | "'" [^']* "'" ;
+INTEGER         ::= [0-9]+ ;
+FLOAT           ::= [0-9]+ "." [0-9]+ ;
+NUMBER          ::= INTEGER | FLOAT ;
+BOOLEAN         ::= "true" | "false" ;
+COMMENT         ::= "#" [^\n]* "\n" ;      (* ignored by lexer *)
+WHITESPACE      ::= [ \t\r\n]+  ;          (* ignored by lexer *)

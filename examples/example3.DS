@@ -1,0 +1,44 @@
+# Example 3: Database + external API → stdout for debugging
+
+
+SOURCE customers_db AS DATABASE {
+    url   = "postgresql://localhost:5432/crm"
+    table = "customers"
+    auth  = BASIC "db_user" "db_pass"
+}
+
+SOURCE geo_api AS API {
+    url    = "https://geo.example.com/v1/locations"
+    method = GET
+    auth   = BEARER "geo-token-999"
+}
+
+PIPELINE customer_geo_report {
+    FETCH FROM customers_db, geo_api
+
+    JOIN geo_api ON customers_db.region_id = geo_api.id
+        TYPE INNER
+
+    FILTER WHERE customers_db.is_active == true AND
+                 NOT customers_db.country IS NULL
+
+    MAP {
+        customer_id   = customers_db.id
+        name          = customers_db.full_name
+        country       = geo_api.country_name
+        signup_year   = customers_db.created_year
+    }
+
+    AGGREGATE {
+        COUNT(customers_db.id) AS total_customers
+        MIN(customers_db.created_year) AS earliest_signup
+    }
+
+    SORT BY total_customers DESC
+
+    LIMIT 50
+}
+
+OUTPUT debug_out TO STDOUT {
+    from = "customer_geo_report"
+}

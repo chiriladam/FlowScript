@@ -1,0 +1,34 @@
+# Example 1: Fetch users from REST API and save to CSV
+
+
+SOURCE users_api AS API {
+    url    = "https://api.example.com/users"
+    method = GET
+    auth   = BEARER "my-secret-token"
+    headers = {
+        "Accept": "application/json",
+        "X-Version": "2"
+    }
+}
+
+PIPELINE user_report {
+    FETCH FROM users_api
+
+    FILTER WHERE age >= 18 AND status == "active"
+
+    MAP {
+        full_name  = first_name + " " + last_name
+        email      = email
+        age_group  = age
+    }
+
+    SORT BY age DESC, full_name ASC
+
+    LIMIT 100
+}
+
+OUTPUT user_csv TO CSV {
+    from      = "user_report"
+    path      = "output/active_users.csv"
+    delimiter = ","
+}
