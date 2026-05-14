@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────
+# Example 4: Local CSV join — no external API needed
+# Join orders.csv with products.csv, aggregate revenue by category
+# ─────────────────────────────────────────────────────────────
+
+SOURCE orders AS CSV {
+    path     = "data/orders.csv"
+    encoding = "utf-8"
+}
+
+SOURCE products AS CSV {
+    path     = "data/products.csv"
+    encoding = "utf-8"
+}
+
+PIPELINE revenue_by_category {
+    FETCH FROM orders
+
+    JOIN products ON orders.product_id = products.id
+        TYPE LEFT
+
+    FILTER WHERE orders.status == "completed"
+
+    MAP {
+        order_id = orders.id
+        category = products.category
+        revenue  = orders.amount
+    }
+
+    AGGREGATE {
+        SUM(revenue)   AS total_revenue
+        COUNT(order_id) AS order_count
+    }
+
+    SORT BY total_revenue DESC
+}
+
+OUTPUT report TO JSON {
+    from   = "revenue_by_category"
+    path   = "output/revenue_report.json"
+    pretty = true
+}
